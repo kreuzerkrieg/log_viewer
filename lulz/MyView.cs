@@ -66,12 +66,13 @@ namespace lulz
             }
 
             var dt = _db.Query();
-            dt.Columns[0].ColumnName = "Timestamp";
-            dt.Columns[1].ColumnName = "Level";
-            dt.Columns[2].ColumnName = "Shard";
-            dt.Columns[3].ColumnName = "Group";
-            dt.Columns[4].ColumnName = "Facility";
-            dt.Columns[5].ColumnName = "Message";
+            dt.Columns[0].ColumnName = "Node";
+            dt.Columns[1].ColumnName = "Timestamp";
+            dt.Columns[2].ColumnName = "Level";
+            dt.Columns[3].ColumnName = "Shard";
+            dt.Columns[4].ColumnName = "Group";
+            dt.Columns[5].ColumnName = "Facility";
+            dt.Columns[6].ColumnName = "Message";
 
             tableView.Table = dt;
             tableView.SetNeedsDisplay();

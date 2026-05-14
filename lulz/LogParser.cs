@@ -33,9 +33,14 @@ public static class LogParser
         @"^(?:INFO|WARN|DEBUG|TRACE|ERROR)\s+\d{4}-\d{2}-\d{2}",
         RegexOptions.Compiled);
 
-    /// <summary>Lazily parses every matching line in the file.</summary>
-    public static IEnumerable<LogEntry> Parse(string filePath)
+    /// <summary>
+    /// Lazily parses every matching line in the file.
+    /// <paramref name="node"/> defaults to the filename stem (e.g. "scylla-gw10-1").
+    /// </summary>
+    public static IEnumerable<LogEntry> Parse(string filePath, string? node = null)
     {
+        node ??= Path.GetFileNameWithoutExtension(filePath);
+
         // Pending entry being built (may span multiple continuation lines)
         string? level = null, ts = null, shard = null, group = null, facility = null;
         StringBuilder? msg = null;
@@ -55,7 +60,7 @@ public static class LogParser
             // Flush previous entry before starting a new one
             if (level is not null)
             {
-                yield return new LogEntry(ts!, level, shard!, group!, facility!, msg!.ToString());
+                yield return new LogEntry(node, ts!, level, shard!, group!, facility!, msg!.ToString());
                 level = null;
             }
 
@@ -85,6 +90,6 @@ public static class LogParser
 
         // Flush last entry
         if (level is not null)
-            yield return new LogEntry(ts!, level, shard!, group!, facility!, msg!.ToString());
+            yield return new LogEntry(node, ts!, level, shard!, group!, facility!, msg!.ToString());
     }
 }

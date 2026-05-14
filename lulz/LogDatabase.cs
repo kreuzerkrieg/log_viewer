@@ -25,6 +25,7 @@ public sealed class LogDatabase : IDisposable
         cmd.CommandText = """
             CREATE TABLE logs (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                node      TEXT NOT NULL,
                 timestamp TEXT NOT NULL,
                 level     TEXT NOT NULL,
                 shard     TEXT NOT NULL,
@@ -36,8 +37,9 @@ public sealed class LogDatabase : IDisposable
         cmd.ExecuteNonQuery();
 
         // Index the most-queried columns
-        cmd.CommandText = "CREATE INDEX idx_level    ON logs(level)";    cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX idx_facility ON logs(facility)"; cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX idx_node     ON logs(node)";      cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX idx_level    ON logs(level)";     cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX idx_facility ON logs(facility)";  cmd.ExecuteNonQuery();
     }
 
     /// <summary>Bulk-inserts entries inside a single transaction.</summary>
@@ -47,13 +49,14 @@ public sealed class LogDatabase : IDisposable
         using var tx  = _conn.BeginTransaction();
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO logs (timestamp, level, shard, grp, facility, message)
-            VALUES ($ts, $lvl, $shard, $grp, $fac, $msg)
+            INSERT INTO logs (node, timestamp, level, shard, grp, facility, message)
+            VALUES ($node, $ts, $lvl, $shard, $grp, $fac, $msg)
             """;
 
+        var pNode  = cmd.Parameters.Add("$node",  SqliteType.Text);
         var pTs    = cmd.Parameters.Add("$ts",    SqliteType.Text);
         var pLvl   = cmd.Parameters.Add("$lvl",   SqliteType.Text);
-        var pShard = cmd.Parameters.Add("$shard",  SqliteType.Text);
+        var pShard = cmd.Parameters.Add("$shard", SqliteType.Text);
         var pGrp   = cmd.Parameters.Add("$grp",   SqliteType.Text);
         var pFac   = cmd.Parameters.Add("$fac",   SqliteType.Text);
         var pMsg   = cmd.Parameters.Add("$msg",   SqliteType.Text);
@@ -61,10 +64,11 @@ public sealed class LogDatabase : IDisposable
         int count = 0;
         foreach (var e in entries)
         {
+            pNode.Value  = e.Node;
             pTs.Value    = e.Timestamp;
             pLvl.Value   = e.Level;
             pShard.Value = e.Shard;
-            pGrp.Value   = e.Group;   // empty string when no group, never DBNull
+            pGrp.Value   = e.Group;
             pFac.Value   = e.Facility;
             pMsg.Value   = e.Message;
             cmd.ExecuteNonQuery();
@@ -77,7 +81,7 @@ public sealed class LogDatabase : IDisposable
 
     /// <summary>Runs an arbitrary SELECT and returns the result as a DataTable.</summary>
     public DataTable Query(string sql =
-        "SELECT timestamp, level, shard, grp, facility, message FROM logs ORDER BY id")
+        "SELECT node, timestamp, level, shard, grp, facility, message FROM logs ORDER BY id")
     {
         using var cmd    = _conn.CreateCommand();
         cmd.CommandText  = sql;
@@ -89,5 +93,4 @@ public sealed class LogDatabase : IDisposable
 
     public void Dispose() => _conn.Dispose();
 }
-
 

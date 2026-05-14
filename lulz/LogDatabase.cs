@@ -22,12 +22,33 @@ public sealed class LogDatabase : IDisposable
     private void CreateTable()
     {
         using var cmd = _conn.CreateCommand();
+
+        // ── system lookup: log level id → name ──────────────────────────────
+        cmd.CommandText = """
+            CREATE TABLE log_levels (
+                id   INTEGER PRIMARY KEY,
+                name TEXT    NOT NULL
+            )
+            """;
+        cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+            INSERT INTO log_levels (id, name) VALUES
+                (0, 'ERROR'),
+                (1, 'WARN'),
+                (2, 'INFO'),
+                (3, 'DEBUG'),
+                (4, 'TRACE')
+            """;
+        cmd.ExecuteNonQuery();
+
+        // ── main log table ───────────────────────────────────────────────────
         cmd.CommandText = """
             CREATE TABLE logs (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 node      TEXT    NOT NULL,
                 timestamp INTEGER NOT NULL,   -- Unix milliseconds; filter with < > BETWEEN
-                level     INTEGER NOT NULL,   -- 0=error 1=warn 2=info 3=debug 4=trace
+                level     INTEGER NOT NULL    REFERENCES log_levels(id),
                 shard     INTEGER,            -- NULL for entries without [shard N]
                 grp       TEXT    NOT NULL,
                 facility  TEXT    NOT NULL,
@@ -107,19 +128,16 @@ public sealed class LogDatabase : IDisposable
     /// </param>
     public DataTable Query(string sql = """
         SELECT
-            node,
-            strftime('%Y-%m-%d %H:%M:%f', timestamp / 1000.0, 'unixepoch') AS timestamp,
-            CASE level
-                WHEN 0 THEN 'ERROR' WHEN 1 THEN 'WARN' WHEN 2 THEN 'INFO'
-                WHEN 3 THEN 'DEBUG' WHEN 4 THEN 'TRACE'
-                ELSE CAST(level AS TEXT)
-            END AS level,
-            COALESCE(CAST(shard AS TEXT), '') AS shard,
-            grp AS grp,
-            facility,
-            message
-        FROM logs
-        ORDER BY timestamp, id
+            l.node,
+            strftime('%Y-%m-%d %H:%M:%f', l.timestamp / 1000.0, 'unixepoch') AS timestamp,
+            COALESCE(ll.name, CAST(l.level AS TEXT)) AS level,
+            COALESCE(CAST(l.shard AS TEXT), '') AS shard,
+            l.grp,
+            l.facility,
+            l.message
+        FROM logs l
+        LEFT JOIN log_levels ll ON ll.id = l.level
+        ORDER BY l.timestamp, l.id
         """)
     {
         using var cmd    = _conn.CreateCommand();

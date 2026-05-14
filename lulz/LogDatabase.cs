@@ -25,7 +25,7 @@ public sealed class LogDatabase : IDisposable
 
         // ── system lookup: log level id → name ──────────────────────────────
         cmd.CommandText = """
-            CREATE TABLE log_levels (
+            CREATE TABLE IF NOT EXISTS log_levels (
                 id   INTEGER PRIMARY KEY,
                 name TEXT    NOT NULL
             )
@@ -33,7 +33,7 @@ public sealed class LogDatabase : IDisposable
         cmd.ExecuteNonQuery();
 
         cmd.CommandText = """
-            INSERT INTO log_levels (id, name) VALUES
+            INSERT OR IGNORE INTO log_levels (id, name) VALUES
                 (0, 'ERROR'),
                 (1, 'WARN'),
                 (2, 'INFO'),
@@ -44,7 +44,7 @@ public sealed class LogDatabase : IDisposable
 
         // ── main log table ───────────────────────────────────────────────────
         cmd.CommandText = """
-            CREATE TABLE logs (
+            CREATE TABLE IF NOT EXISTS logs (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 node      TEXT    NOT NULL,
                 timestamp INTEGER NOT NULL,   -- Unix milliseconds; filter with < > BETWEEN
@@ -57,10 +57,10 @@ public sealed class LogDatabase : IDisposable
             """;
         cmd.ExecuteNonQuery();
 
-        cmd.CommandText = "CREATE INDEX idx_node      ON logs(node)";       cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX idx_level     ON logs(level)";      cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX idx_facility  ON logs(facility)";   cmd.ExecuteNonQuery();
-        cmd.CommandText = "CREATE INDEX idx_timestamp ON logs(timestamp)";  cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_node      ON logs(node)";       cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_level     ON logs(level)";      cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_facility  ON logs(facility)";   cmd.ExecuteNonQuery();
+        cmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_timestamp ON logs(timestamp)";  cmd.ExecuteNonQuery();
     }
 
     /// <summary>Bulk-inserts entries inside a single transaction.</summary>

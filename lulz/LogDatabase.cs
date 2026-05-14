@@ -26,7 +26,7 @@ public sealed class LogDatabase : IDisposable
             CREATE TABLE logs (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 node      TEXT    NOT NULL,
-                timestamp TEXT    NOT NULL,   -- YYYY-MM-DD HH:MM:SS.mmm, ISO-sortable
+                timestamp INTEGER NOT NULL,   -- Unix milliseconds; filter with < > BETWEEN
                 level     INTEGER NOT NULL,   -- 0=error 1=warn 2=info 3=debug 4=trace
                 shard     INTEGER,            -- NULL for entries without [shard N]
                 grp       TEXT    NOT NULL,
@@ -54,7 +54,7 @@ public sealed class LogDatabase : IDisposable
             """;
 
         var pNode  = cmd.Parameters.Add("$node",  SqliteType.Text);
-        var pTs    = cmd.Parameters.Add("$ts",    SqliteType.Text);
+        var pTs    = cmd.Parameters.Add("$ts",    SqliteType.Integer);
         var pLvl   = cmd.Parameters.Add("$lvl",   SqliteType.Integer);
         var pShard = cmd.Parameters.Add("$shard", SqliteType.Integer);
         var pGrp   = cmd.Parameters.Add("$grp",   SqliteType.Text);
@@ -100,17 +100,22 @@ public sealed class LogDatabase : IDisposable
     }
 
     /// <summary>Runs an arbitrary SELECT and returns the result as a DataTable.</summary>
+    /// <param name="sql">
+    /// Query against the raw schema. Use <c>timestamp</c> as INTEGER Unix-ms for filtering,
+    /// e.g. <c>WHERE timestamp BETWEEN $from AND $to</c>.
+    /// The default query formats it to a human-readable UTC string for display.
+    /// </param>
     public DataTable Query(string sql = """
         SELECT
             node,
-            timestamp,
+            strftime('%Y-%m-%d %H:%M:%f', timestamp / 1000.0, 'unixepoch') AS timestamp,
             CASE level
                 WHEN 0 THEN 'ERROR' WHEN 1 THEN 'WARN' WHEN 2 THEN 'INFO'
                 WHEN 3 THEN 'DEBUG' WHEN 4 THEN 'TRACE'
                 ELSE CAST(level AS TEXT)
             END AS level,
             COALESCE(CAST(shard AS TEXT), '') AS shard,
-            grp       AS grp,
+            grp AS grp,
             facility,
             message
         FROM logs

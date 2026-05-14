@@ -1,5 +1,6 @@
 namespace lulz;
 
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -93,13 +94,16 @@ public static class LogParser
         string node, string levelStr, string tsRaw,
         string? shardStr, string group, string facility, string message)
     {
-        // Normalize timestamp: replace comma millisecond separator with dot
-        var ts = tsRaw.Replace(',', '.');
+        // Parse "YYYY-MM-DD HH:MM:SS,mmm" or "YYYY-MM-DD HH:MM:SS.mmm" → Unix ms
+        var tsNorm = tsRaw.Replace(',', '.');
+        long tsMs  = 0;
+        if (DateTime.TryParseExact(tsNorm, "yyyy-MM-dd HH:mm:ss.fff",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            tsMs = new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
 
-        var level = LevelMap.TryGetValue(levelStr, out var l) ? l : 2; // default INFO
-
+        var level = LevelMap.TryGetValue(levelStr, out var l) ? l : 2;
         int? shard = shardStr is not null && int.TryParse(shardStr, out var s) ? s : null;
 
-        return new LogEntry(node, ts, level, shard, group, facility, message);
+        return new LogEntry(node, tsMs, level, shard, group, facility, message);
     }
 }

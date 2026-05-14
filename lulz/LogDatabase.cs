@@ -64,7 +64,7 @@ public sealed class LogDatabase : IDisposable
             pTs.Value    = e.Timestamp;
             pLvl.Value   = e.Level;
             pShard.Value = e.Shard;
-            pGrp.Value   = (object?)e.Group ?? DBNull.Value;
+            pGrp.Value   = e.Group;   // empty string when no group, never DBNull
             pFac.Value   = e.Facility;
             pMsg.Value   = e.Message;
             cmd.ExecuteNonQuery();
@@ -89,4 +89,5 @@ public sealed class LogDatabase : IDisposable
 
     public void Dispose() => _conn.Dispose();
 }
+
 

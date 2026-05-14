@@ -18,7 +18,6 @@ namespace lulz
         {
             InitializeComponent();
             ApplyTurboVisionTheme();
-            // button1.Clicked += (s, e) => MessageBox.Query("Hello", "Hello There!", "Ok");
         }
 
         private static void ShowHelp()

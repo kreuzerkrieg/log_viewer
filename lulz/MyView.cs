@@ -16,11 +16,12 @@ namespace lulz
         private static void ShowHelp()
         {
             MessageBox.Query(
-                60, 12,
+                60, 14,
                 "Help — Log Commander",
                 "  Log Commander v0.1\n\n" +
                 "  F1   This help screen\n" +
-                "  F3   Open a log file\n" +
+                "  F3   Open a log file (additive — keeps previous nodes)\n" +
+                "  F4   New session (clears all loaded nodes)\n" +
                 "  F10  Exit\n\n" +
                 "  Use arrow keys to navigate the log table.\n" +
                 "  Ctrl+Q also exits at any time.",
@@ -39,18 +40,42 @@ namespace lulz
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
                 return;
 
+            // First file: create a fresh database.
+            // Subsequent files: append into the existing one (additive).
+            if (_db is null)
+            {
+                _db = new LogDatabase();
+            }
+            else
+            {
+                var node = Path.GetFileNameWithoutExtension(path);
+                if (_db.ContainsNode(node))
+                {
+                    MessageBox.Query(50, 7, "Already loaded",
+                        $"'{node}' is already in the current session.", "OK");
+                    return;
+                }
+            }
+
             LoadLog(path);
+        }
+
+        private void NewSession()
+        {
+            if (_db is null) return;
+            _db.Dispose();
+            _db = null;
+            tableView.Table = BuildEmptyTable();
+            tableView.SetNeedsDisplay();
+            Title = "Log Commander";
         }
 
         private void LoadLog(string path)
         {
-            _db?.Dispose();
-            _db = new LogDatabase();
-
             int count;
             try
             {
-                count = _db.Insert(LogParser.Parse(path));
+                count = _db!.Insert(LogParser.Parse(path));
             }
             catch (Exception ex)
             {
@@ -65,7 +90,12 @@ namespace lulz
                 return;
             }
 
-            var dt = _db.Query();
+            RefreshTable();
+        }
+
+        private void RefreshTable()
+        {
+            var dt = _db!.Query();
             dt.Columns[0].ColumnName = "Node";
             dt.Columns[1].ColumnName = "Timestamp";
             dt.Columns[2].ColumnName = "Level";
@@ -76,7 +106,18 @@ namespace lulz
 
             tableView.Table = dt;
             tableView.SetNeedsDisplay();
-            Title = $"Log Commander — {Path.GetFileName(path)} ({count:N0} lines)";
+
+            var nodes = _db.LoadedNodes();
+            var nodeList = string.Join(", ", nodes);
+            Title = $"Log Commander — [{nodeList}] ({dt.Rows.Count:N0} lines)";
+        }
+
+        private static System.Data.DataTable BuildEmptyTable()
+        {
+            var dt = new System.Data.DataTable();
+            foreach (var col in new[] { "Node", "Timestamp", "Level", "Shard", "Group", "Facility", "Message" })
+                dt.Columns.Add(col);
+            return dt;
         }
 
         private void ApplyTurboVisionTheme()
@@ -130,10 +171,11 @@ namespace lulz
             tableView.Style.ShowVerticalHeaderLines         = false;
 
             // Re-wire status bar items with proper Borland-style F-key shortcuts and actions
-            help    = new StatusItem(Key.F1,  "~F1~ Help",     ShowHelp);
-            openLog = new StatusItem(Key.F3,  "~F3~ Open Log", OpenLog);
-            quit    = new StatusItem(Key.F10, "~F10~ Quit",    () => Application.RequestStop());
-            statusBar.Items = new[] { help, openLog, quit };
+            help    = new StatusItem(Key.F1,  "~F1~ Help",        ShowHelp);
+            openLog = new StatusItem(Key.F3,  "~F3~ Open Log",    OpenLog);
+            quit    = new StatusItem(Key.F10, "~F10~ Quit",       () => Application.RequestStop());
+            var newSession = new StatusItem(Key.F4, "~F4~ New Session", NewSession);
+            statusBar.Items = new[] { help, openLog, newSession, quit };
         }
 
         public override bool ProcessKey(KeyEvent keyEvent)
@@ -145,6 +187,9 @@ namespace lulz
                     return true;
                 case Key.F3:
                     OpenLog();
+                    return true;
+                case Key.F4:
+                    NewSession();
                     return true;
                 case Key.F10:
                 case Key.CtrlMask | Key.Q:

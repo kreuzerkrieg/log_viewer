@@ -79,9 +79,29 @@ public sealed class LogDatabase : IDisposable
         return count;
     }
 
+    /// <summary>Returns true if entries for this node are already in the database.</summary>
+    public bool ContainsNode(string node)
+    {
+        using var cmd   = _conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(1) FROM logs WHERE node = $node LIMIT 1";
+        cmd.Parameters.AddWithValue("$node", node);
+        return (long)cmd.ExecuteScalar()! > 0;
+    }
+
+    /// <summary>Returns the distinct node names currently loaded.</summary>
+    public IReadOnlyList<string> LoadedNodes()
+    {
+        using var cmd   = _conn.CreateCommand();
+        cmd.CommandText = "SELECT DISTINCT node FROM logs ORDER BY node";
+        using var reader = cmd.ExecuteReader();
+        var nodes = new List<string>();
+        while (reader.Read()) nodes.Add(reader.GetString(0));
+        return nodes;
+    }
+
     /// <summary>Runs an arbitrary SELECT and returns the result as a DataTable.</summary>
     public DataTable Query(string sql =
-        "SELECT node, timestamp, level, shard, grp, facility, message FROM logs ORDER BY id")
+        "SELECT node, timestamp, level, shard, grp, facility, message FROM logs ORDER BY timestamp, id")
     {
         using var cmd    = _conn.CreateCommand();
         cmd.CommandText  = sql;
@@ -93,4 +113,3 @@ public sealed class LogDatabase : IDisposable
 
     public void Dispose() => _conn.Dispose();
 }
-

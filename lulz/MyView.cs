@@ -30,6 +30,18 @@ namespace lulz
 
         private void OpenLog()
         {
+            // Defer to the next idle tick — calling Application.Run() directly
+            // inside ProcessKey re-enters the event loop synchronously and the
+            // dialog never gets a chance to render.
+            Application.MainLoop.AddIdle(() =>
+            {
+                RunOpenDialog();
+                return false; // one-shot; do not reschedule
+            });
+        }
+
+        private void RunOpenDialog()
+        {
             var dialog = new OpenDialog("Open Log File", "Select a Scylla/Seastar log file");
             Application.Run(dialog);
 
